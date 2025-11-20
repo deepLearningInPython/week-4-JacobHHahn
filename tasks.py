@@ -1,4 +1,5 @@
 import numpy as np
+import re
 
 # Follow the tasks below to practice basic Python concepts.
 # Write your code in between the dashed lines.
@@ -29,7 +30,8 @@ import numpy as np
 text = "The quick brown fox jumps over the lazy dog!"
 
 # Write a list comprehension to tokenize the text and remove punctuation
-tokens = _ # Your code here
+words = text.split()
+tokens = [w.rstrip('.,!') for w in words]
 
 # Expected output: ['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dog']
 print(tokens)
@@ -45,8 +47,10 @@ print(tokens)
 # Your code here:
 # -----------------------------------------------
 def tokenize(string: str) -> list:
-    pass # Your code
-
+    words = string.split()
+    tokens = [re.sub(r'[^a-z]', '', w.lower()) for w in words]
+    unique_tokens = sorted(set(tokens))
+    return unique_tokens
 
 # -----------------------------------------------
 
@@ -74,14 +78,14 @@ def tokenize(string: str) -> list:
 
 # Your code here:
 # -----------------------------------------------
-word_frequencies = _ # Your code here
+word_frequencies = {token: sum(1 for w in text.split() if re.sub(r'[^a-z0-9]', '', w.lower())==token) for token in tokenize(text)}
 
 # Expected output example: {'the': 2, 'quick': 1, ...}
 print(word_frequencies)
 
 # Modify the comprehension to include only words that appear more than once.
 # -----------------------------------------------
-
+word_frequencies = {token: count for token, count in word_frequencies.items() if count > 1}
 
 
 # Task 4: Define a function that takes a string and an integer k, and returns a dictionary with
@@ -90,15 +94,16 @@ print(word_frequencies)
 # Your code here:
 # -----------------------------------------------
 def token_counts(string: str, k: int = 1) -> dict:
-    pass # Your code
+    # produce full token list (not unique) and count frequencies
+    full_tokens = [re.sub(r'[^a-z0-9]', '', w.lower()) for w in string.split()]
+    full_tokens = [t for t in full_tokens if t]
+    counts = {tok: full_tokens.count(tok) for tok in set(full_tokens) if full_tokens.count(tok) > k}
+    return counts
 
 # test:
 text_hist = {'the': 2, 'quick': 1, 'brown': 1, 'fox': 1, 'jumps': 1, 'over': 1, 'lazy': 1, 'dog': 1}
 all(text_hist[key] == value for key, value in token_counts(text).items())
 # -----------------------------------------------
-
-
-
 
 # [C] Sets & Dictionary comprehension: Mapping unique tokens to numbers and vice versa
 #   Objective: Practice dictionary comprehensions and create mappings from tokens to unique 
@@ -121,7 +126,7 @@ all(text_hist[key] == value for key, value in token_counts(text).items())
 
 # Your code here:
 # -----------------------------------------------
-token_to_id = _ # Your code here
+token_to_id = {tok: i for i, tok in enumerate(tokenize(text))}
 
 # Expected output: {'dog': 0, 'quick': 1, 'fox': 2, 'the': 3, 'over': 4, 'lazy': 5, 'brown': 6, 'jumps': 7}
 print(token_to_id)
@@ -133,7 +138,7 @@ print(token_to_id)
 #
 # Your code here:
 # -----------------------------------------------
-id_to_token = _ # Your code here
+id_to_token = {i: tok for tok, i in token_to_id.items()}
 
 # tests: 
 # test 1
@@ -154,8 +159,15 @@ assert all(id_to_token[token_to_id[key]]==key for key in token_to_id) and all(to
 # Your code here:
 # -----------------------------------------------
 def make_vocabulary_map(documents: list) -> tuple:
-    # Hint: use your tokenize function
-    pass # Your code
+    all_tokens = []
+    for doc in documents:
+        all_tokens.extend([re.sub(r'[^a-z0-9]', '', w.lower()) for w in doc.split()])
+    all_tokens = [t for t in all_tokens if t]
+    unique = sorted(set(all_tokens))
+    token2int = {tok: i for i, tok in enumerate(unique)}
+    int2token = {i: tok for tok, i in token2int.items()}
+    return token2int, int2token
+
 
 # Test
 t2i, i2t = make_vocabulary_map([text])
@@ -174,8 +186,13 @@ all(i2t[t2i[tok]] == tok for tok in t2i) # should be True
 # Your code here:
 # -----------------------------------------------
 def tokenize_and_encode(documents: list) -> list:
-    # Hint: use your make_vocabulary_map and tokenize function
-    pass # Your code
+    t2i, i2t = make_vocabulary_map(documents)
+    encoded = []
+    for doc in documents:
+        toks = [re.sub(r'[^a-z0-9]', '', w.lower()) for w in doc.split()]
+        toks = [t for t in toks if t]
+        encoded.append([t2i[t] for t in toks])
+    return encoded, t2i, i2t
 
 # Test:
 enc, t2i, i2t = tokenize_and_encode([text, 'What a luck we had today!'])
@@ -201,7 +218,7 @@ enc, t2i, i2t = tokenize_and_encode([text, 'What a luck we had today!'])
 
 # Your code here:
 # -----------------------------------------------
-sigmoid = _ # Your code
+sigmoid = lambda x: 1.0 / (1.0 + np.exp(-x))
 
 # Test:
 np.all(sigmoid(np.log([1, 1/3, 1/7])) == np.array([1/2, 1/4, 1/8]))
@@ -276,7 +293,27 @@ np.all(sigmoid(np.log([1, 1/3, 1/7])) == np.array([1/2, 1/4, 1/8]))
 # Your code here:
 # -----------------------------------------------
 def rnn_layer(w: np.array, list_of_sequences: list[np.array], sigma=sigmoid ) -> np.array:
-    pass # Your code
+    # infer dims from first sequence
+    if len(list_of_sequences) == 0:
+        return np.array([])
+    input_dim = list_of_sequences[0].shape[1]
+    hidden_dim = input_dim                       # using same assumption as in the tests
+    W_size = hidden_dim * input_dim
+    U_size = hidden_dim * hidden_dim
+    B_size = hidden_dim                           # B is a single-row output
+    assert W_size + U_size + B_size == len(w), "unexpected weight vector length"
+    W = w[0:W_size].reshape((hidden_dim, input_dim))
+    U = w[W_size:W_size+U_size].reshape((hidden_dim, hidden_dim))
+    B = w[W_size+U_size:W_size+U_size+B_size].reshape((1, hidden_dim))
+    outputs = []
+    for X in list_of_sequences:
+        a = np.zeros(hidden_dim)
+        for j in range(X.shape[0]):
+            xj = X[j, :]
+            a = sigma(W @ xj + U @ a)
+        out = (B @ a).item()
+        outputs.append(out)
+    return np.array(outputs)
 
 # Test
 np.random.seed(10)
@@ -310,8 +347,9 @@ o.shape == (100,) and o.mean().round(3) == 16.287 and o.std().astype(int) == 133
 
 # Your code here:
 # -----------------------------------------------
-def rnn_loss(w: np.array, w, list_of_sequences: list[np.array], y: np.array) -> np.float64:
-    pass # Your code
+def rnn_loss(w: np.array, list_of_sequences: list[np.array], y: np.array) -> np.float64:
+    pred = rnn_layer(w, list_of_sequences)
+    return np.sum((y - pred) ** 2)
 
 # Test:
 y = np.array([(X @ np.arange(1,4))[0] for X in list_of_sequences])
